@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swiggy SQL Data Analysis</title>
+    <title>Swiggy Dynamic BI Dashboard</title>
     
-    <!-- Load Tailwind CSS -->
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Chart.js -->
+    
+    <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Load Google Fonts -->
+    
+    <!-- PapaParse for high-performance CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <script>
@@ -19,7 +24,7 @@
                     fontFamily: { sans: ['Inter', 'sans-serif'] },
                     colors: {
                         brand: {
-                            orange: '#FC8019', /* Swiggy brand color */
+                            orange: '#FC8019',
                             dark: '#282C3F',
                             light: '#F8F9FA'
                         }
@@ -30,199 +35,373 @@
     </script>
     <style>
         body { background-color: #F8F9FA; }
-        .kpi-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            border: 1px solid rgba(0,0,0,0.05);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        
+        /* Custom Loading Spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #FC8019;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
         }
-        .kpi-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        canvas {
+            -moz-user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
         }
     </style>
 </head>
-<body class="text-gray-800 antialiased min-h-screen flex flex-col">
+<body class="text-gray-800 antialiased min-h-screen flex flex-col relative">
 
-    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-brand-orange rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md">S</div>
                     <div>
-                        <h1 class="text-xl font-bold text-brand-dark leading-tight">Swiggy BI Dashboard</h1>
-                        <p class="text-xs text-gray-500 font-medium">SQL Portfolio Project</p>
+                        <h1 class="text-xl font-bold text-brand-dark leading-tight">Swiggy Dynamic Dashboard</h1>
+                        <p class="text-xs text-gray-500 font-medium">Browser-side Aggregation Engine</p>
                     </div>
                 </div>
-                <div class="text-sm text-gray-500 font-medium">Data updated: 2026</div>
+                <div id="recordCountBadge" class="hidden bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full border border-green-200">
+                    Data Loaded
+                </div>
             </div>
         </div>
     </nav>
 
-    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex flex-col relative">
         
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <!-- Total Restaurants -->
-            <div class="kpi-card p-6 border-t-4 border-t-brand-orange">
-                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Total Restaurants</p>
-                <h2 class="text-3xl font-bold text-gray-900 mt-2">148,543</h2>
-                <p class="text-xs text-green-600 mt-2 font-medium">Across 600+ Cities</p>
-            </div>
-            
-            <!-- Top City -->
-            <div class="kpi-card p-6 border-t-4 border-t-blue-500">
-                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Top City by Volume</p>
-                <h2 class="text-3xl font-bold text-gray-900 mt-2">Bangalore</h2>
-                <p class="text-xs text-gray-500 mt-2 font-medium">16,543 Active Listings</p>
-            </div>
-            
-            <!-- Top Cuisine -->
-            <div class="kpi-card p-6 border-t-4 border-t-purple-500">
-                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Most Popular Cuisine</p>
-                <h2 class="text-3xl font-bold text-gray-900 mt-2">North Indian</h2>
-                <p class="text-xs text-purple-600 mt-2 font-medium">Dominates 25% of Market</p>
-            </div>
-            
-            <!-- Best Value -->
-            <div class="kpi-card p-6 border-t-4 border-t-green-500">
-                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Best Value City</p>
-                <h2 class="text-3xl font-bold text-gray-900 mt-2">Hyderabad</h2>
-                <p class="text-xs text-green-600 mt-2 font-medium">High Rating to Price Ratio</p>
-            </div>
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="absolute inset-0 bg-gray-50/90 z-30 flex flex-col items-center justify-center rounded-xl hidden min-h-[500px]">
+            <div class="loader mb-4"></div>
+            <h2 class="text-xl font-bold text-brand-dark">Crunching Data...</h2>
+            <p class="text-gray-500 mt-2 text-sm max-w-sm text-center">Parsing 150,000+ rows and calculating aggregations in your browser. This might take a few seconds.</p>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- File Upload Fallback Section -->
+        <div id="uploadSection" class="hidden mb-8 bg-white p-8 rounded-xl shadow-sm border border-orange-200 text-center">
+            <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-brand-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Dataset Not Found Automatically</h2>
+            <p class="text-gray-600 mb-6 max-w-xl mx-auto">We couldn't locate <strong>swiggy.csv</strong> in the root folder. Please select the dataset from your computer to generate the dashboard live.</p>
             
-            <!-- Bar Chart: Top Cities -->
-            <div class="kpi-card p-6 lg:col-span-2">
-                <h3 class="text-lg font-bold text-gray-800 mb-1">Restaurant Distribution by City</h3>
-                <p class="text-sm text-gray-500 mb-6">Top 10 markets based on total active listings</p>
-                <div class="relative h-72 w-full">
-                    <canvas id="citiesChart"></canvas>
-                </div>
-            </div>
+            <label class="cursor-pointer bg-brand-orange hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors shadow-md inline-block">
+                <span>Select swiggy.csv File</span>
+                <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+            </label>
+            <div id="uploadError" class="text-red-500 mt-4 text-sm font-medium hidden"></div>
+        </div>
 
-            <!-- Doughnut Chart: Cuisines -->
-            <div class="kpi-card p-6 lg:col-span-1">
-                <h3 class="text-lg font-bold text-gray-800 mb-1">Cuisine Market Share</h3>
-                <p class="text-sm text-gray-500 mb-6">Top 5 categories vs Others</p>
-                <div class="relative h-72 w-full flex justify-center">
-                    <canvas id="cuisineChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Bar Chart: Value Metrics -->
-            <div class="kpi-card p-6 lg:col-span-3">
-                <h3 class="text-lg font-bold text-gray-800 mb-1">Average Cost vs Average Rating</h3>
-                <p class="text-sm text-gray-500 mb-6">Value for money metrics across top metropolitan areas</p>
-                <div class="relative h-80 w-full">
-                    <canvas id="valueChart"></canvas>
-                </div>
+        <!-- Dashboard Charts Grid -->
+        <div id="dashboardSection" class="grid grid-cols-1 lg:grid-cols-2 gap-6 hidden">
+            
+            <!-- Chart 1: Top Cities -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-lg font-bold text-gray-800 mb-1">Top 10 Cities by Volume</h2>
+                <p class="text-xs text-gray-500 mb-4">Total number of restaurants listed per city</p>
+                <div class="relative h-72 w-full"><canvas id="cityChart"></canvas></div>
             </div>
             
+            <!-- Chart 2: Top Cuisines -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-lg font-bold text-gray-800 mb-1">Top 10 Popular Cuisines</h2>
+                <p class="text-xs text-gray-500 mb-4">Most frequently tagged food categories</p>
+                <div class="relative h-72 w-full flex justify-center"><canvas id="cuisineChart"></canvas></div>
+            </div>
+
+            <!-- Chart 3: Top Restaurant Chains -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-lg font-bold text-gray-800 mb-1">Top 10 Restaurant Chains</h2>
+                <p class="text-xs text-gray-500 mb-4">Businesses with the highest number of branches</p>
+                <div class="relative h-72 w-full"><canvas id="chainChart"></canvas></div>
+            </div>
+
+            <!-- Chart 4: Top Rated Cities -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-lg font-bold text-gray-800 mb-1">Highest Rated Cities</h2>
+                <p class="text-xs text-gray-500 mb-4">Average rating (Min. 50 valid rated restaurants)</p>
+                <div class="relative h-72 w-full"><canvas id="ratingChart"></canvas></div>
+            </div>
+
         </div>
     </main>
 
     <script>
-        Chart.defaults.font.family = "'Inter', sans-serif";
-        Chart.defaults.color = '#6B7280'; 
+        // DOM Elements
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const uploadSection = document.getElementById('uploadSection');
+        const dashboardSection = document.getElementById('dashboardSection');
+        const recordCountBadge = document.getElementById('recordCountBadge');
+        const uploadError = document.getElementById('uploadError');
+        
+        // Store Chart instances so we can destroy them if re-rendered
+        let chartInstances = {};
 
-        const tooltipStyle = {
+        // Chart.js Global Config
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#6B7280';
+        const tooltipConfig = {
             backgroundColor: '#282C3F',
             titleFont: { size: 13, weight: 'bold' },
-            bodyFont: { size: 12 },
+            bodyFont: { size: 13 },
             padding: 10,
-            cornerRadius: 8
+            cornerRadius: 6,
+            displayColors: false
         };
 
-        // 1. Cities Bar Chart
-        new Chart(document.getElementById('citiesChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: ['Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Pune', 'Chennai', 'Kolkata', 'Ahmedabad', 'Jaipur', 'Chandigarh'],
-                datasets: [{
-                    label: 'Restaurants',
-                    data: [16543, 14210, 13890, 11450, 9600, 8100, 7550, 5200, 4100, 3200],
-                    backgroundColor: '#FC8019', 
-                    borderRadius: 6,
-                    barPercentage: 0.6
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false }, tooltip: tooltipStyle },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: '#F3F4F6' }, border: { display: false } },
-                    x: { grid: { display: false }, border: { display: false } }
-                }
-            }
+        // Initialize application on load
+        document.addEventListener('DOMContentLoaded', () => {
+            attemptAutoFetch();
         });
 
-        // 2. Cuisines Doughnut Chart
-        new Chart(document.getElementById('cuisineChart').getContext('2d'), {
-            type: 'doughnut',
-            data: {
-                labels: ['North Indian', 'Chinese', 'Fast Food', 'South Indian', 'Biryani', 'Other'],
-                datasets: [{
-                    data: [25, 18, 15, 12, 10, 20],
-                    backgroundColor: ['#FC8019', '#282C3F', '#3B82F6', '#10B981', '#8B5CF6', '#E5E7EB'],
-                    borderWidth: 0,
-                    hoverOffset: 4
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false, cutout: '70%',
-                plugins: {
-                    legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } },
-                    tooltip: tooltipStyle
-                }
-            }
-        });
+        function attemptAutoFetch() {
+            showLoading(true);
+            
+            // Try to fetch swiggy.csv from the same directory
+            fetch('swiggy.csv')
+                .then(response => {
+                    if (!response.ok) throw new Error('File not found');
+                    return response.text();
+                })
+                .then(csvText => {
+                    parseCSV(csvText);
+                })
+                .catch(error => {
+                    // Fallback to manual upload if fetch fails
+                    showLoading(false);
+                    uploadSection.classList.remove('hidden');
+                });
+        }
 
-        // 3. Value for Money (Mixed Bar/Line Chart)
-        new Chart(document.getElementById('valueChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune'],
-                datasets: [
-                    {
-                        label: 'Average Cost for Two (₹)',
-                        data: [750, 680, 650, 550, 500, 520],
-                        backgroundColor: '#282C3F',
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'Average Rating (Out of 5)',
-                        data: [4.1, 4.0, 4.2, 4.1, 4.3, 4.0],
-                        type: 'line',
-                        borderColor: '#FC8019',
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showError("Please upload a valid CSV file.");
+                return;
+            }
+
+            hideError();
+            showLoading(true);
+            uploadSection.classList.add('hidden');
+
+            // Parse local file
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                worker: true, // Uses Web Workers to avoid freezing UI on huge files
+                complete: function(results) {
+                    processData(results.data);
+                },
+                error: function(err) {
+                    showLoading(false);
+                    uploadSection.classList.remove('hidden');
+                    showError("Error parsing CSV: " + err.message);
+                }
+            });
+        }
+
+        function parseCSV(csvText) {
+            Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true,
+                worker: true,
+                complete: function(results) {
+                    processData(results.data);
+                }
+            });
+        }
+
+        function processData(data) {
+            // Aggregation Objects
+            const cityCount = {};
+            const cuisineCount = {};
+            const chainCount = {};
+            const cityRatings = {}; // Will store { totalScore, count }
+
+            // Loop through all records (Similar to SQL GROUP BY)
+            data.forEach(row => {
+                // Handle variations in column names (name vs restaurant_name)
+                const name = row.name || row.restaurant_name;
+                const city = row.city;
+                const cuisine = row.cuisine;
+                const rating = row.rating;
+
+                // 1. City Counts
+                if (city) {
+                    cityCount[city] = (cityCount[city] || 0) + 1;
+                }
+
+                // 2. Cuisine Counts (Note: Some datasets have comma separated cuisines. We'll count exact tags for simplicity here, or you could split them).
+                if (cuisine) {
+                    cuisineCount[cuisine] = (cuisineCount[cuisine] || 0) + 1;
+                }
+
+                // 3. Chain Counts
+                if (name) {
+                    chainCount[name] = (chainCount[name] || 0) + 1;
+                }
+
+                // 4. Ratings (Filter out 'NEW', '--' and empty)
+                if (city && rating && rating !== 'NEW' && rating !== '--') {
+                    const parsedRating = parseFloat(rating);
+                    if (!isNaN(parsedRating)) {
+                        if (!cityRatings[city]) cityRatings[city] = { total: 0, count: 0 };
+                        cityRatings[city].total += parsedRating;
+                        cityRatings[city].count += 1;
+                    }
+                }
+            });
+
+            // Process dictionaries into sorted arrays for charts
+            const topCities = getTopN(cityCount, 10);
+            const topCuisines = getTopN(cuisineCount, 10);
+            const topChains = getTopN(chainCount, 10);
+            
+            // Calculate Average Ratings & Filter > 50 restaurants (Equivalent to SQL HAVING count > 50)
+            const topRatedCities = Object.keys(cityRatings)
+                .filter(city => cityRatings[city].count >= 50)
+                .map(city => ({
+                    name: city,
+                    val: (cityRatings[city].total / cityRatings[city].count).toFixed(2)
+                }))
+                .sort((a, b) => b.val - a.val)
+                .slice(0, 10);
+
+            // Render the Dashboard
+            showLoading(false);
+            recordCountBadge.textContent = `${data.length.toLocaleString()} Rows Processed`;
+            recordCountBadge.classList.remove('hidden');
+            dashboardSection.classList.remove('hidden');
+            
+            renderCharts(topCities, topCuisines, topChains, topRatedCities);
+        }
+
+        // Helper to sort object frequencies into Top N arrays
+        function getTopN(dict, n) {
+            return Object.keys(dict)
+                .map(key => ({ name: key, val: dict[key] }))
+                .sort((a, b) => b.val - a.val)
+                .slice(0, n);
+        }
+
+        function renderCharts(cities, cuisines, chains, ratings) {
+            
+            // Helper to extract labels and data
+            const getLabels = (arr) => arr.map(item => item.name);
+            const getData = (arr) => arr.map(item => item.val);
+
+            // Destroy existing charts to prevent hover glitching if user re-uploads
+            Object.values(chartInstances).forEach(chart => chart.destroy());
+
+            // 1. City Chart (Bar)
+            const ctxCity = document.getElementById('cityChart').getContext('2d');
+            chartInstances.city = new Chart(ctxCity, {
+                type: 'bar',
+                data: {
+                    labels: getLabels(cities),
+                    datasets: [{
+                        label: 'Restaurants',
+                        data: getData(cities),
                         backgroundColor: '#FC8019',
-                        borderWidth: 3,
-                        pointRadius: 5,
-                        yAxisID: 'y1'
-                    }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { tooltip: tooltipStyle },
-                scales: {
-                    x: { grid: { display: false } },
-                    y: { 
-                        type: 'linear', display: true, position: 'left',
-                        title: { display: true, text: 'Cost (₹)' },
-                        grid: { color: '#F3F4F6' }
-                    },
-                    y1: {
-                        type: 'linear', display: true, position: 'right',
-                        title: { display: true, text: 'Rating' },
-                        min: 3.5, max: 5.0,
-                        grid: { drawOnChartArea: false }
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: tooltipConfig },
+                    scales: { y: { beginAtZero: true, grid: { borderDash: [2,4] } }, x: { grid: { display: false } } }
+                }
+            });
+
+            // 2. Cuisine Chart (Doughnut)
+            const ctxCuisine = document.getElementById('cuisineChart').getContext('2d');
+            chartInstances.cuisine = new Chart(ctxCuisine, {
+                type: 'doughnut',
+                data: {
+                    labels: getLabels(cuisines),
+                    datasets: [{
+                        data: getData(cuisines),
+                        backgroundColor: ['#FC8019', '#3B82F6', '#10B981', '#8B5CF6', '#F43F5E', '#EAB308', '#06B6D4', '#64748B', '#D946EF', '#14B8A6'],
+                        borderWidth: 2, hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '60%',
+                    plugins: { legend: { position: 'right', labels: { boxWidth: 12, usePointStyle: true } }, tooltip: tooltipConfig }
+                }
+            });
+
+            // 3. Chain Chart (Horizontal Bar)
+            const ctxChain = document.getElementById('chainChart').getContext('2d');
+            chartInstances.chain = new Chart(ctxChain, {
+                type: 'bar',
+                data: {
+                    labels: getLabels(chains),
+                    datasets: [{
+                        label: 'Branches',
+                        data: getData(chains),
+                        backgroundColor: '#3B82F6', // Blue to differentiate
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // Makes it horizontal
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: tooltipConfig },
+                    scales: { x: { beginAtZero: true, grid: { borderDash: [2,4] } }, y: { grid: { display: false } } }
+                }
+            });
+
+            // 4. Ratings Chart (Bar)
+            const ctxRating = document.getElementById('ratingChart').getContext('2d');
+            chartInstances.rating = new Chart(ctxRating, {
+                type: 'bar',
+                data: {
+                    labels: getLabels(ratings),
+                    datasets: [{
+                        label: 'Avg Rating',
+                        data: getData(ratings),
+                        backgroundColor: '#10B981', // Green for positive rating
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: tooltipConfig },
+                    scales: { 
+                        y: { min: 3.5, max: 5.0, grid: { borderDash: [2,4] } }, // Set min 3.5 so differences are visible
+                        x: { grid: { display: false } } 
                     }
                 }
+            });
+        }
+
+        function showLoading(show) {
+            if(show) {
+                loadingOverlay.classList.remove('hidden');
+            } else {
+                loadingOverlay.classList.add('hidden');
             }
-        });
+        }
+
+        function showError(msg) {
+            uploadError.textContent = msg;
+            uploadError.classList.remove('hidden');
+        }
+        
+        function hideError() {
+            uploadError.classList.add('hidden');
+        }
     </script>
 </body>
 </html>
