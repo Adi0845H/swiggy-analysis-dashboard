@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swiggy SQL Data Analysis</title>
+    
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Load Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            orange: '#FC8019', /* Swiggy brand color */
+                            dark: '#282C3F',
+                            light: '#F8F9FA'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #F8F9FA; }
+        .kpi-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen flex flex-col">
+
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-brand-orange rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md">S</div>
+                    <div>
+                        <h1 class="text-xl font-bold text-brand-dark leading-tight">Swiggy BI Dashboard</h1>
+                        <p class="text-xs text-gray-500 font-medium">SQL Portfolio Project</p>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-500 font-medium">Data updated: 2026</div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Total Restaurants -->
+            <div class="kpi-card p-6 border-t-4 border-t-brand-orange">
+                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Total Restaurants</p>
+                <h2 class="text-3xl font-bold text-gray-900 mt-2">148,543</h2>
+                <p class="text-xs text-green-600 mt-2 font-medium">Across 600+ Cities</p>
+            </div>
+            
+            <!-- Top City -->
+            <div class="kpi-card p-6 border-t-4 border-t-blue-500">
+                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Top City by Volume</p>
+                <h2 class="text-3xl font-bold text-gray-900 mt-2">Bangalore</h2>
+                <p class="text-xs text-gray-500 mt-2 font-medium">16,543 Active Listings</p>
+            </div>
+            
+            <!-- Top Cuisine -->
+            <div class="kpi-card p-6 border-t-4 border-t-purple-500">
+                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Most Popular Cuisine</p>
+                <h2 class="text-3xl font-bold text-gray-900 mt-2">North Indian</h2>
+                <p class="text-xs text-purple-600 mt-2 font-medium">Dominates 25% of Market</p>
+            </div>
+            
+            <!-- Best Value -->
+            <div class="kpi-card p-6 border-t-4 border-t-green-500">
+                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Best Value City</p>
+                <h2 class="text-3xl font-bold text-gray-900 mt-2">Hyderabad</h2>
+                <p class="text-xs text-green-600 mt-2 font-medium">High Rating to Price Ratio</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Bar Chart: Top Cities -->
+            <div class="kpi-card p-6 lg:col-span-2">
+                <h3 class="text-lg font-bold text-gray-800 mb-1">Restaurant Distribution by City</h3>
+                <p class="text-sm text-gray-500 mb-6">Top 10 markets based on total active listings</p>
+                <div class="relative h-72 w-full">
+                    <canvas id="citiesChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Doughnut Chart: Cuisines -->
+            <div class="kpi-card p-6 lg:col-span-1">
+                <h3 class="text-lg font-bold text-gray-800 mb-1">Cuisine Market Share</h3>
+                <p class="text-sm text-gray-500 mb-6">Top 5 categories vs Others</p>
+                <div class="relative h-72 w-full flex justify-center">
+                    <canvas id="cuisineChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Bar Chart: Value Metrics -->
+            <div class="kpi-card p-6 lg:col-span-3">
+                <h3 class="text-lg font-bold text-gray-800 mb-1">Average Cost vs Average Rating</h3>
+                <p class="text-sm text-gray-500 mb-6">Value for money metrics across top metropolitan areas</p>
+                <div class="relative h-80 w-full">
+                    <canvas id="valueChart"></canvas>
+                </div>
+            </div>
+            
+        </div>
+    </main>
+
+    <script>
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#6B7280'; 
+
+        const tooltipStyle = {
+            backgroundColor: '#282C3F',
+            titleFont: { size: 13, weight: 'bold' },
+            bodyFont: { size: 12 },
+            padding: 10,
+            cornerRadius: 8
+        };
+
+        // 1. Cities Bar Chart
+        new Chart(document.getElementById('citiesChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: ['Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Pune', 'Chennai', 'Kolkata', 'Ahmedabad', 'Jaipur', 'Chandigarh'],
+                datasets: [{
+                    label: 'Restaurants',
+                    data: [16543, 14210, 13890, 11450, 9600, 8100, 7550, 5200, 4100, 3200],
+                    backgroundColor: '#FC8019', 
+                    borderRadius: 6,
+                    barPercentage: 0.6
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: tooltipStyle },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#F3F4F6' }, border: { display: false } },
+                    x: { grid: { display: false }, border: { display: false } }
+                }
+            }
+        });
+
+        // 2. Cuisines Doughnut Chart
+        new Chart(document.getElementById('cuisineChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['North Indian', 'Chinese', 'Fast Food', 'South Indian', 'Biryani', 'Other'],
+                datasets: [{
+                    data: [25, 18, 15, 12, 10, 20],
+                    backgroundColor: ['#FC8019', '#282C3F', '#3B82F6', '#10B981', '#8B5CF6', '#E5E7EB'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '70%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } },
+                    tooltip: tooltipStyle
+                }
+            }
+        });
+
+        // 3. Value for Money (Mixed Bar/Line Chart)
+        new Chart(document.getElementById('valueChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune'],
+                datasets: [
+                    {
+                        label: 'Average Cost for Two (₹)',
+                        data: [750, 680, 650, 550, 500, 520],
+                        backgroundColor: '#282C3F',
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Average Rating (Out of 5)',
+                        data: [4.1, 4.0, 4.2, 4.1, 4.3, 4.0],
+                        type: 'line',
+                        borderColor: '#FC8019',
+                        backgroundColor: '#FC8019',
+                        borderWidth: 3,
+                        pointRadius: 5,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { tooltip: tooltipStyle },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { 
+                        type: 'linear', display: true, position: 'left',
+                        title: { display: true, text: 'Cost (₹)' },
+                        grid: { color: '#F3F4F6' }
+                    },
+                    y1: {
+                        type: 'linear', display: true, position: 'right',
+                        title: { display: true, text: 'Rating' },
+                        min: 3.5, max: 5.0,
+                        grid: { drawOnChartArea: false }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
